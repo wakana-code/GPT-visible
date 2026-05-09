@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NanoGPT Visualizer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;background:#0a0e1a;color:#e0e6f0;min-height:100vh;overflow-x:hidden;}
+header{background:linear-gradient(135deg,#0f1629,#1a1f3a);border-bottom:1px solid #2a3050;padding:20px 32px;display:flex;align-items:center;gap:16px;}
+header .logo{width:42px;height:42px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;}
+header h1{font-size:22px;font-weight:700;}
+header h1 span{color:#8b5cf6;}
+header p{font-size:13px;color:#7a82a6;margin-top:2px;}
+.container{max-width:1440px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+@media(max-width:900px){.container{grid-template-columns:1fr;}}
+.card{background:#111827;border:1px solid #1e2740;border-radius:14px;padding:24px;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa);}
+.card h2{font-size:16px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.card h2 .icon{width:28px;height:28px;background:rgba(99,102,241,.15);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+textarea{width:100%;background:#0d1117;border:1px solid #2a3050;border-radius:10px;color:#e0e6f0;font-family:'Fira Code','Consolas',monospace;font-size:14px;padding:14px;resize:vertical;min-height:80px;outline:none;transition:border-color .2s;}
+textarea:focus{border-color:#6366f1;}
+.btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+button{padding:10px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;}
+button:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 20px rgba(99,102,241,.4);}
+.btn-secondary{background:#1e2740;color:#a5b4fc;border:1px solid #2a3050;}
+.btn-secondary:hover:not(:disabled){background:#263050;}
+.btn-danger{background:#7f1d1d;color:#fca5a5;}
+.params{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.param-group{display:flex;flex-direction:column;gap:4px;}
+.param-group label{font-size:12px;color:#7a82a6;font-weight:500;}
+.param-group input[type="range"]{-webkit-appearance:none;height:6px;background:#1e2740;border-radius:3px;outline:none;width:100%;}
+.param-group input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#6366f1;cursor:pointer;}
+.param-val{font-size:12px;color:#a5b4fc;font-weight:600;}
+#training-log{background:#0d1117;border:1px solid #1e2740;border-radius:10px;padding:12px;font-family:'Fira Code',monospace;font-size:12px;max-height:200px;overflow-y:auto;margin-top:14px;color:#7a82a6;line-height:1.6;}
+.prediction-area{margin-top:14px;}
+.token-stream{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;min-height:40px;}
+.token-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:13px;font-family:'Fira Code',monospace;background:#1e2740;color:#e0e6f0;border:1px solid #2a3050;}
+.token-chip.predicted{background:rgba(99,102,241,.2);border-color:#6366f1;color:#a5b4fc;animation:fadeIn .3s;}
+@keyframes fadeIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+.prob-list{margin-top:14px;display:flex;flex-direction:column;gap:6px;max-height:350px;overflow-y:auto;}
+.prob-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+.prob-label{min-width:80px;font-family:'Fira Code',monospace;text-align:right;color:#a5b4fc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.prob-bar-bg{flex:1;height:20px;background:#1e2740;border-radius:4px;overflow:hidden;position:relative;}
+.prob-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width .4s;}
+.prob-val{min-width:55px;font-size:12px;color:#7a82a6;text-align:right;}
+.full-width{grid-column:1/-1;}
+#vector-canvas{width:100%;height:450px;background:#0d1117;border:1px solid #1e2740;border-radius:10px;cursor:crosshair;}
+.vis-controls{display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;}
+.vis-controls select{padding:6px 12px;background:#1e2740;border:1px solid #2a3050;border-radius:6px;color:#e0e6f0;font-size:13px;outline:none;}
+#attention-canvas{width:100%;height:350px;background:#0d1117;border:1px solid #1e2740;border-radius:10px;margin-top:10px;}
+.status-bar{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+.status-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#7a82a6;}
+.status-dot{width:8px;height:8px;border-radius:50%;}
+.status-dot.green{background:#10b981;}
+.status-dot.yellow{background:#f59e0b;animation:pulse 1s infinite;}
+.status-dot.red{background:#ef4444;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#2a3050;border-radius:3px;}
+.tooltip{position:fixed;background:#1e2740;border:1px solid #3a4570;border-radius:8px;padding:10px 14px;font-size:12px;pointer-events:none;z-index:100;display:none;max-width:300px;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.tooltip .tt-token{color:#a5b4fc;font-weight:700;font-size:14px;}
+.tooltip .tt-vec{color:#7a82a6;margin-top:4px;font-family:monospace;font-size:11px;word-break:break-all;}
+.arch-info{background:#0d1117;border:1px solid #1e2740;border-radius:10px;padding:14px;margin-top:14px;font-size:12px;color:#7a82a6;line-height:1.8;}
+.arch-info code{background:#1e2740;padding:2px 6px;border-radius:4px;color:#a5b4fc;font-size:11px;}
+.loss-chart{width:100%;height:100px;margin-top:10px;background:#0d1117;border:1px solid #1e2740;border-radius:8px;}
+.info-box{background:#0d1117;border:1px solid #2a3050;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12px;color:#7a82a6;line-height:1.6;}
+.info-box strong{color:#a5b4fc;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">N</div>
+  <div>
+    <h1>Nano<span>GPT</span> Visualizer</h1>
+    <p>ブラウザ上で動くミニTransformer — 学習・推論・可視化をリアルタイムに</p>
+  </div>
+</header>
+<div class="container">
+  <!-- TRAINING -->
+  <div class="card">
+    <h2><div class="icon">🧠</div> モデル学習</h2>
+    <textarea id="training-text" rows="6">I like to eat apples in the morning. She likes to eat bananas in the evening. He likes to drink coffee in the morning. We like to drink tea in the afternoon. They like to eat oranges in the evening. I want to read books at night. She wants to read papers in the morning. He wants to write code in the afternoon. We want to play games at night. They want to watch movies in the evening. The cat sleeps on the mat during the day. The dog plays in the garden every morning. A bird sings in the tree every evening. The fish swims in the pond all day. I go to school every morning. She goes to work every afternoon. He runs in the park every evening. We study at the library at night. They cook dinner in the kitchen every evening. My friend reads a book every night. Her brother writes a letter every morning. His sister plays piano every afternoon.</textarea>
+    <div class="params">
+      <div class="param-group"><label>Embedding Size: <span class="param-val" id="emb-val">32</span></label><input type="range" id="emb-size" min="16" max="96" step="8" value="32"></div>
+      <div class="param-group"><label>Attention Heads: <span class="param-val" id="heads-val">2</span></label><input type="range" id="num-heads" min="1" max="4" step="1" value="2"></div>
+      <div class="param-group"><label>Layers: <span class="param-val" id="layers-val">2</span></label><input type="range" id="num-layers" min="1" max="4" step="1" value="2"></div>
+      <div class="param-group"><label>Context Window: <span class="param-val" id="ctx-val">8</span></label><input type="range" id="ctx-size" min="4" max="16" step="1" value="8"></div>
+      <div class="param-group"><label>Learning Rate: <span class="param-val" id="lr-val">0.0010</span></label><input type="range" id="lr" min="0.0001" max="0.01" step="0.0001" value="0.001"></div>
+      <div class="param-group"><label>Epochs: <span class="param-val" id="epoch-val">300</span></label><input type="range" id="epochs" min="50" max="2000" step="50" value="300"></div>
+      <div class="param-group"><label>Dropout: <span class="param-val" id="drop-val">0.15</span></label><input type="range" id="dropout" min="0" max="0.5" step="0.05" value="0.15"></div>
+      <div class="param-group"><label>Weight Decay: <span class="param-val" id="wd-val">0.01</span></label><input type="range" id="weight-decay" min="0" max="0.1" step="0.005" value="0.01"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-train" onclick="startTraining()">🚀 学習開始</button>
+      <button class="btn-secondary" id="btn-stop" onclick="stopTraining()" disabled>⏹ 停止</button>
+      <button class="btn-danger" onclick="resetModel()">🔄 リセット</button>
+    </div>
+    <div class="status-bar"><div class="status-item"><div class="status-dot red" id="status-dot"></div><span id="status-text">未学習</span></div></div>
+    <canvas class="loss-chart" id="loss-chart"></canvas>
+    <div id="training-log"></div>
+    <div class="arch-info">
+      <strong>アーキテクチャ:</strong><br>
+      <code>Token Emb</code> + <code>Pos Emb</code> → [<code>LayerNorm</code> → <code>Causal Multi-Head Attention + Dropout</code> → <code>LayerNorm</code> → <code>FFN(GELU) + Dropout</code>] × N → <code>LayerNorm</code> → <code>Linear(weight-tied) → Softmax</code><br>
+      Adam + Weight Decay + Gradient Clipping で学習。Dropoutで過学習を抑制。
+    </div>
+  </div>
+
+  <!-- PREDICTION -->
+  <div class="card">
+    <h2><div class="icon">🔮</div> Next Token Prediction</h2>
+    <textarea id="prompt-text" rows="2">I like to</textarea>
+    <div class="params">
+      <div class="param-group"><label>Temperature: <span class="param-val" id="temp-val">1.0</span></label><input type="range" id="temperature" min="0.1" max="2.0" step="0.1" value="1.0"></div>
+      <div class="param-group"><label>生成トークン数: <span class="param-val" id="gen-val">10</span></label><input type="range" id="gen-count" min="1" max="30" step="1" value="10"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="generateTokens()" id="btn-generate">✨ 一括生成</button>
+      <button class="btn-secondary" onclick="generateStep()">1️⃣ 1トークンずつ</button>
+      <button class="btn-secondary" onclick="clearGeneration()">🗑 クリア</button>
+    </div>
+    <div class="prediction-area">
+      <h3 style="font-size:13px;color:#7a82a6;margin-top:14px;">生成結果: <span style="font-size:11px;color:#4a5070;">(紫=生成トークン)</span></h3>
+      <div class="token-stream" id="token-stream"></div>
+    </div>
+    <h3 style="font-size:13px;color:#7a82a6;margin-top:20px;">次トークン確率分布 (Top-15):</h3>
+    <div class="prob-list" id="prob-list"></div>
+    <div class="info-box" id="pred-info" style="display:none;"></div>
+  </div>
+
+  <!-- VECTOR VIS -->
+  <div class="card full-width">
+    <h2><div class="icon">📊</div> トークン埋め込みベクトル可視化</h2>
+    <canvas id="vector-canvas"></canvas>
+    <div class="vis-controls">
+      <select id="vis-method" onchange="updateVectorVis()"><option value="pca">PCA</option><option value="tsne">t-SNE</option></select>
+      <button class="btn-secondary" onclick="updateVectorVis()">🔄 更新</button>
+      <label style="font-size:12px;color:#7a82a6;"><input type="checkbox" id="show-labels" checked onchange="updateVectorVis()"> ラベル表示</label>
+      <label style="font-size:12px;color:#7a82a6;"><input type="checkbox" id="show-connections" onchange="updateVectorVis()"> 類似度接続</label>
+    </div>
+    <div class="tooltip" id="tooltip"><div class="tt-token"></div><div class="tt-vec"></div></div>
+  </div>
+
+  <!-- ATTENTION VIS -->
+  <div class="card full-width">
+    <h2><div class="icon">👁️</div> Attention 重み可視化</h2>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;"><textarea id="attn-text" rows="1" style="min-height:40px;">I like to eat</textarea></div>
+      <select id="attn-layer" style="padding:8px 12px;background:#1e2740;border:1px solid #2a3050;border-radius:6px;color:#e0e6f0;font-size:13px;"><option value="0">Layer 0</option><option value="1">Layer 1</option></select>
+      <select id="attn-head" style="padding:8px 12px;background:#1e2740;border:1px solid #2a3050;border-radius:6px;color:#e0e6f0;font-size:13px;"><option value="0">Head 0</option><option value="1">Head 1</option></select>
+      <button class="btn-primary" onclick="visualizeAttention()">🔍 表示</button>
+    </div>
+    <canvas id="attention-canvas"></canvas>
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  NanoGPT — Full Transformer with Backprop, Dropout, Weight Decay
+// ================================================================
+
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function softmax(x){
+  const m=x.reduce((a,b)=>Math.max(a,b),-Infinity);
+  const e=x.map(v=>Math.exp(v-m));
+  const s=e.reduce((a,b)=>a+b,0);
+  return e.map(v=>v/s);
+}
+
+// ---- Tensor ----
+class Tensor{
+  constructor(r,c,data=null){this.rows=r;this.cols=c;this.data=data||new Float32Array(r*c);this.grad=new Float32Array(r*c);}
+  static randn(r,c,s=0.02){const t=new Tensor(r,c);for(let i=0;i<r*c;i++)t.data[i]=randn()*s;return t;}
+  static zeros(r,c){return new Tensor(r,c);}
+  static ones(r,c){const t=new Tensor(r,c);t.data.fill(1);return t;}
+  get(i,j){return this.data[i*this.cols+j];}
+  set(i,j,v){this.data[i*this.cols+j]=v;}
+  addGrad(i,j,v){this.grad[i*this.cols+j]+=v;}
+  zeroGrad(){this.grad.fill(0);}
+}
+
+// ---- Tokenizer ----
+class Tokenizer{
+  constructor(){this.w2i={};this.i2w=[];this.vocabSize=0;}
+  fit(text){
+    const words=text.toLowerCase().replace(/([.,!?;:'])/g,' $1 ').split(/\s+/).filter(w=>w.length>0);
+    const unique=[...new Set(words)].sort();
+    this.w2i={};this.i2w=[];
+    for(let i=0;i<unique.length;i++){this.w2i[unique[i]]=i;this.i2w.push(unique[i]);}
+    this.vocabSize=unique.length;
+    return words.map(w=>this.w2i[w]);
+  }
+  encode(text){
+    const words=text.toLowerCase().replace(/([.,!?;:'])/g,' $1 ').split(/\s+/).filter(w=>w.length>0);
+    return words.map(w=>w in this.w2i?this.w2i[w]:0);
+  }
+  decode(ids){return ids.map(i=>this.i2w[i]||'<?>').join(' ');}
+}
+
+// ================================================================
+//  NanoGPT Model
+// ================================================================
+class NanoGPT{
+  constructor(V,E,H,L,C,dropRate=0.1){
+    this.V=V;this.E=E;this.H=H;this.L=L;this.C=C;
+    this.D=Math.floor(E/H);
+    this.dropRate=dropRate;
+    this.training=true; // toggle for dropout
+
+    // Weight-tied: lmHead shares weights with wte
+    this.wte=Tensor.randn(V,E,0.02);
+    this.wpe=Tensor.randn(C,E,0.01);
+    
+    this.layers=[];
+    for(let l=0;l<L;l++){
+      this.layers.push({
+        ln1g:Tensor.ones(1,E),ln1b:Tensor.zeros(1,E),
+        Wqkv:Tensor.randn(E,3*E,0.02/Math.sqrt(2*L*E)),
+        bqkv:Tensor.zeros(1,3*E),
+        Wo:Tensor.randn(E,E,0.02/Math.sqrt(2*L*E)),
+        bo:Tensor.zeros(1,E),
+        ln2g:Tensor.ones(1,E),ln2b:Tensor.zeros(1,E),
+        W1:Tensor.randn(E,4*E,0.02/Math.sqrt(2*L*E)),
+        b1:Tensor.zeros(1,4*E),
+        W2:Tensor.randn(4*E,E,0.02/Math.sqrt(2*L*4*E)),
+        b2:Tensor.zeros(1,E),
+      });
+    }
+    this.lnfg=Tensor.ones(1,E);this.lnfb=Tensor.zeros(1,E);
+    // lmHead is tied to wte (we transpose wte for output)
+    
+    this.allParams=this._collectParams();
+    this.lastAttnWeights=null;
+  }
+
+  _collectParams(){
+    const p=[this.wte,this.wpe];
+    for(const l of this.layers)p.push(l.ln1g,l.ln1b,l.Wqkv,l.bqkv,l.Wo,l.bo,l.ln2g,l.ln2b,l.W1,l.b1,l.W2,l.b2);
+    p.push(this.lnfg,this.lnfb);
+    return p;
+  }
+  zeroGrad(){for(const p of this.allParams)p.zeroGrad();}
+
+  _dropout(arr){
+    // arr is Float32Array; in-place if training
+    if(!this.training||this.dropRate<=0)return {out:arr,mask:null};
+    const mask=new Uint8Array(arr.length);
+    const scale=1/(1-this.dropRate);
+    const out=new Float32Array(arr.length);
+    for(let i=0;i<arr.length;i++){
+      if(Math.random()<this.dropRate){mask[i]=0;out[i]=0;}
+      else{mask[i]=1;out[i]=arr[i]*scale;}
+    }
+    return {out,mask,scale};
+  }
+
+  _dropoutRow(rows){
+    // Apply dropout to each row (array of Float32Array)
+    if(!this.training||this.dropRate<=0) return {out:rows.map(r=>Float32Array.from(r)),masks:null};
+    const out=[];const masks=[];
+    const scale=1/(1-this.dropRate);
+    for(const row of rows){
+      const m=new Uint8Array(row.length);
+      const o=new Float32Array(row.length);
+      for(let i=0;i<row.length;i++){
+        if(Math.random()<this.dropRate){m[i]=0;o[i]=0;}
+        else{m[i]=1;o[i]=row[i]*scale;}
+      }
+      out.push(o);masks.push(m);
+    }
+    return {out,masks,scale};
+  }
+
+  forward(tokenIds){
+    const T=tokenIds.length,E=this.E,H=this.H,D=this.D,V=this.V;
+    
+    // Embedding
+    const x=[];
+    for(let t=0;t<T;t++){
+      const row=new Float32Array(E);
+      for(let e=0;e<E;e++) row[e]=this.wte.get(tokenIds[t],e)+this.wpe.get(t%this.C,e);
+      x.push(row);
+    }
+    
+    this._cache={tokenIds,T};
+    this._layerCaches=[];
+    let hidden=x;
+    this.lastAttnWeights=[];
+    
+    for(let li=0;li<this.L;li++){
+      const layer=this.layers[li];
+      const lc={};
+      lc.inputH=hidden.map(h=>Float32Array.from(h));
+      
+      // LN1
+      const ln1=this._layerNorm(hidden,layer.ln1g,layer.ln1b);
+      lc.ln1=ln1;
+      
+      // QKV
+      const qkv=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(3*E);
+        for(let j=0;j<3*E;j++){
+          let s=layer.bqkv.data[j];
+          for(let e=0;e<E;e++) s+=ln1.out[t][e]*layer.Wqkv.get(e,j);
+          row[j]=s;
+        }
+        qkv.push(row);
+      }
+      lc.qkv=qkv;
+      
+      // Multi-head causal attention
+      const attnOut=[];
+      for(let t=0;t<T;t++) attnOut.push(new Float32Array(E));
+      const attnWeightsAll=[];
+      
+      for(let h=0;h<H;h++){
+        const headSoftmax=[];
+        for(let qi=0;qi<T;qi++){
+          const scores=[];
+          for(let ki=0;ki<=qi;ki++){
+            let dot=0;
+            for(let d=0;d<D;d++) dot+=qkv[qi][h*D+d]*qkv[ki][E+h*D+d];
+            scores.push(dot/Math.sqrt(D));
+          }
+          const sm=softmax(scores);
+          headSoftmax.push(sm);
+          for(let ki=0;ki<=qi;ki++){
+            for(let d=0;d<D;d++) attnOut[qi][h*D+d]+=sm[ki]*qkv[ki][2*E+h*D+d];
+          }
+        }
+        attnWeightsAll.push(headSoftmax);
+      }
+      this.lastAttnWeights.push(attnWeightsAll);
+      lc.attnWeights=attnWeightsAll;
+      lc.attnOut=attnOut.map(r=>Float32Array.from(r));
+      
+      // Output projection
+      const projected=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++){
+          let s=layer.bo.data[e];
+          for(let j=0;j<E;j++) s+=attnOut[t][j]*layer.Wo.get(j,e);
+          row[e]=s;
+        }
+        projected.push(row);
+      }
+
+      // Dropout on attention output
+      const dropAttn=this._dropoutRow(projected);
+      lc.dropAttn=dropAttn;
+
+      // Residual 1
+      const res1=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++) row[e]=hidden[t][e]+dropAttn.out[t][e];
+        res1.push(row);
+      }
+      
+      // LN2
+      const ln2=this._layerNorm(res1,layer.ln2g,layer.ln2b);
+      lc.ln2=ln2;lc.res1=res1;
+      
+      // FFN
+      const midPre=[];const mid=[];
+      for(let t=0;t<T;t++){
+        const pre=new Float32Array(4*E);
+        const act=new Float32Array(4*E);
+        for(let j=0;j<4*E;j++){
+          let s=layer.b1.data[j];
+          for(let e=0;e<E;e++) s+=ln2.out[t][e]*layer.W1.get(e,j);
+          pre[j]=s;
+          act[j]=s*0.5*(1+Math.tanh(Math.sqrt(2/Math.PI)*(s+0.044715*s*s*s)));
+        }
+        midPre.push(pre);mid.push(act);
+      }
+      lc.midPre=midPre;lc.mid=mid;
+      
+      const ffnOut=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++){
+          let s=layer.b2.data[e];
+          for(let j=0;j<4*E;j++) s+=mid[t][j]*layer.W2.get(j,e);
+          row[e]=s;
+        }
+        ffnOut.push(row);
+      }
+      lc.ffnOut=ffnOut;
+
+      // Dropout on FFN output
+      const dropFFN=this._dropoutRow(ffnOut);
+      lc.dropFFN=dropFFN;
+      
+      // Residual 2
+      hidden=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++) row[e]=res1[t][e]+dropFFN.out[t][e];
+        hidden.push(row);
+      }
+      this._layerCaches.push(lc);
+    }
+    
+    // Final LN
+    const lnf=this._layerNorm(hidden,this.lnfg,this.lnfb);
+    this._cache.lnf=lnf;
+    this._cache.finalHidden=hidden;
+    
+    // Logits: weight-tied with wte (lnf.out[t] × wte^T)
+    const allLogits=[];
+    for(let t=0;t<T;t++){
+      const logits=new Float32Array(V);
+      for(let v=0;v<V;v++){
+        let s=0;
+        for(let e=0;e<E;e++) s+=lnf.out[t][e]*this.wte.get(v,e);
+        logits[v]=s;
+      }
+      allLogits.push(logits);
+    }
+    this._cache.allLogits=allLogits;
+    return allLogits;
+  }
+
+  _layerNorm(x,g,b){
+    const T=x.length,E=x[0].length;
+    const out=[],means=[],vars=[];
+    for(let t=0;t<T;t++){
+      let mean=0;for(let e=0;e<E;e++)mean+=x[t][e];mean/=E;
+      let v=0;for(let e=0;e<E;e++)v+=(x[t][e]-mean)**2;v/=E;
+      means.push(mean);vars.push(v);
+      const std=Math.sqrt(v+1e-5);
+      const row=new Float32Array(E);
+      for(let e=0;e<E;e++) row[e]=g.data[e]*((x[t][e]-mean)/std)+b.data[e];
+      out.push(row);
+    }
+    return {out,input:x,means,vars,g,b};
+  }
+
+  backward(tokenIds,targets){
+    const T=this._cache.T,E=this.E,V=this.V,H=this.H,D=this.D;
+    
+    // Cross-entropy loss gradient
+    const dLogits=[];
+    let totalLoss=0;
+    for(let t=0;t<T;t++){
+      const probs=softmax(Array.from(this._cache.allLogits[t]));
+      const target=targets[t];
+      totalLoss+=-Math.log(probs[target]+1e-10);
+      const dl=new Float32Array(V);
+      for(let v=0;v<V;v++) dl[v]=(probs[v]-(v===target?1:0))/T;
+      dLogits.push(dl);
+    }
+    
+    // Backward through lmHead (tied weights: wte)
+    const lnf=this._cache.lnf;
+    const dLnfOut=[];
+    for(let t=0;t<T;t++){
+      const row=new Float32Array(E);
+      for(let e=0;e<E;e++){
+        let s=0;
+        for(let v=0;v<V;v++){
+          s+=dLogits[t][v]*this.wte.get(v,e);
+          // Gradient for wte from output projection
+          this.wte.addGrad(v,e,lnf.out[t][e]*dLogits[t][v]);
+        }
+        row[e]=s;
+      }
+      dLnfOut.push(row);
+    }
+    
+    let dHidden=this._layerNormBackward(dLnfOut,lnf,this.lnfg,this.lnfb);
+    
+    for(let li=this.L-1;li>=0;li--){
+      const layer=this.layers[li];
+      const lc=this._layerCaches[li];
+      
+      const dRes1=dHidden.map(r=>Float32Array.from(r));
+
+      // Backward dropout FFN
+      const dFfnOut=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        if(lc.dropFFN.masks){
+          for(let e=0;e<E;e++) row[e]=lc.dropFFN.masks[t][e]?dHidden[t][e]*lc.dropFFN.scale:0;
+        } else {
+          for(let e=0;e<E;e++) row[e]=dHidden[t][e];
+        }
+        dFfnOut.push(row);
+      }
+      
+      // Backward W2
+      const dMid=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(4*E);
+        for(let j=0;j<4*E;j++){
+          let s=0;
+          for(let e=0;e<E;e++){
+            s+=dFfnOut[t][e]*layer.W2.get(j,e);
+            layer.W2.addGrad(j,e,lc.mid[t][j]*dFfnOut[t][e]);
+          }
+          row[j]=s;
+        }
+        dMid.push(row);
+        for(let e=0;e<E;e++) layer.b2.addGrad(0,e,dFfnOut[t][e]);
+      }
+      
+      // Backward GELU
+      const dMidPre=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(4*E);
+        for(let j=0;j<4*E;j++){
+          const xx=lc.midPre[t][j];
+          const tanhArg=Math.sqrt(2/Math.PI)*(xx+0.044715*xx*xx*xx);
+          const tv=Math.tanh(tanhArg);
+          const dg=0.5*(1+tv)+0.5*xx*(1-tv*tv)*Math.sqrt(2/Math.PI)*(1+3*0.044715*xx*xx);
+          row[j]=dMid[t][j]*dg;
+        }
+        dMidPre.push(row);
+      }
+      
+      // Backward W1
+      const dLn2Out=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++){
+          let s=0;
+          for(let j=0;j<4*E;j++){
+            s+=dMidPre[t][j]*layer.W1.get(e,j);
+            layer.W1.addGrad(e,j,lc.ln2.out[t][e]*dMidPre[t][j]);
+          }
+          row[e]=s;
+        }
+        dLn2Out.push(row);
+        for(let j=0;j<4*E;j++) layer.b1.addGrad(0,j,dMidPre[t][j]);
+      }
+      
+      const dRes1FromLn2=this._layerNormBackward(dLn2Out,lc.ln2,layer.ln2g,layer.ln2b);
+      for(let t=0;t<T;t++) for(let e=0;e<E;e++) dRes1[t][e]+=dRes1FromLn2[t][e];
+      
+      // Backward dropout attention
+      const dProjected=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        if(lc.dropAttn.masks){
+          for(let e=0;e<E;e++) row[e]=lc.dropAttn.masks[t][e]?dRes1[t][e]*lc.dropAttn.scale:0;
+        } else {
+          for(let e=0;e<E;e++) row[e]=dRes1[t][e];
+        }
+        dProjected.push(row);
+      }
+      const dInputH=dRes1.map(r=>Float32Array.from(r));
+      
+      // Backward Wo
+      const dAttnOut=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let j=0;j<E;j++){
+          let s=0;
+          for(let e=0;e<E;e++){
+            s+=dProjected[t][e]*layer.Wo.get(j,e);
+            layer.Wo.addGrad(j,e,lc.attnOut[t][j]*dProjected[t][e]);
+          }
+          row[j]=s;
+        }
+        dAttnOut.push(row);
+        for(let e=0;e<E;e++) layer.bo.addGrad(0,e,dProjected[t][e]);
+      }
+      
+      // Backward attention
+      const dQKV=[];
+      for(let t=0;t<T;t++) dQKV.push(new Float32Array(3*E));
+      
+      for(let h=0;h<H;h++){
+        const sm=lc.attnWeights[h];
+        for(let qi=0;qi<T;qi++){
+          const dWeights=new Float32Array(qi+1);
+          for(let ki=0;ki<=qi;ki++){
+            for(let d=0;d<D;d++){
+              dQKV[ki][2*E+h*D+d]+=sm[qi][ki]*dAttnOut[qi][h*D+d];
+              dWeights[ki]+=lc.qkv[ki][2*E+h*D+d]*dAttnOut[qi][h*D+d];
+            }
+          }
+          let sdot=0;
+          for(let ki=0;ki<=qi;ki++) sdot+=sm[qi][ki]*dWeights[ki];
+          const scale=1/Math.sqrt(D);
+          for(let ki=0;ki<=qi;ki++){
+            const ds=sm[qi][ki]*(dWeights[ki]-sdot);
+            for(let d=0;d<D;d++){
+              dQKV[qi][h*D+d]+=ds*lc.qkv[ki][E+h*D+d]*scale;
+              dQKV[ki][E+h*D+d]+=ds*lc.qkv[qi][h*D+d]*scale;
+            }
+          }
+        }
+      }
+      
+      // Backward Wqkv
+      const dLn1Out=[];
+      for(let t=0;t<T;t++){
+        const row=new Float32Array(E);
+        for(let e=0;e<E;e++){
+          let s=0;
+          for(let j=0;j<3*E;j++){
+            s+=dQKV[t][j]*layer.Wqkv.get(e,j);
+            layer.Wqkv.addGrad(e,j,lc.ln1.out[t][e]*dQKV[t][j]);
+          }
+          row[e]=s;
+        }
+        dLn1Out.push(row);
+        for(let j=0;j<3*E;j++) layer.bqkv.addGrad(0,j,dQKV[t][j]);
+      }
+      
+      const dInputFromLn1=this._layerNormBackward(dLn1Out,lc.ln1,layer.ln1g,layer.ln1b);
+      for(let t=0;t<T;t++) for(let e=0;e<E;e++) dInputH[t][e]+=dInputFromLn1[t][e];
+      
+      dHidden=dInputH;
+    }
+    
+    // Backward embeddings
+    for(let t=0;t<T;t++){
+      const tok=tokenIds[t];
+      for(let e=0;e<E;e++){
+        this.wte.addGrad(tok,e,dHidden[t][e]);
+        this.wpe.addGrad(t%this.C,e,dHidden[t][e]);
+      }
+    }
+    
+    return totalLoss;
+  }
+
+  _layerNormBackward(dout,lnCache,gParam,bParam){
+    const T=dout.length,E=dout[0].length;
+    const dx=[];
+    for(let t=0;t<T;t++){
+      const mean=lnCache.means[t],v=lnCache.vars[t];
+      const std=Math.sqrt(v+1e-5);
+      const xhat=new Float32Array(E);
+      for(let e=0;e<E;e++) xhat[e]=(lnCache.input[t][e]-mean)/std;
+      
+      for(let e=0;e<E;e++){
+        gParam.addGrad(0,e,dout[t][e]*xhat[e]);
+        bParam.addGrad(0,e,dout[t][e]);
+      }
+      
+      const dxhat=new Float32Array(E);
+      for(let e=0;e<E;e++) dxhat[e]=dout[t][e]*gParam.data[e];
+      
+      // dx = (1/std) * (dxhat - mean(dxhat) - xhat * mean(xhat * dxhat))
+      let meanDxhat=0,meanXhatDxhat=0;
+      for(let e=0;e<E;e++){meanDxhat+=dxhat[e];meanXhatDxhat+=xhat[e]*dxhat[e];}
+      meanDxhat/=E;meanXhatDxhat/=E;
+      
+      const row=new Float32Array(E);
+      for(let e=0;e<E;e++) row[e]=(dxhat[e]-meanDxhat-xhat[e]*meanXhatDxhat)/std;
+      dx.push(row);
+    }
+    return dx;
+  }
+
+  // AdamW
+  step(lr,wd=0.01,beta1=0.9,beta2=0.999,eps=1e-8){
+    if(!this._adam){
+      this._adam={t:0,m:[],v:[]};
+      for(const p of this.allParams){
+        this._adam.m.push(new Float32Array(p.data.length));
+        this._adam.v.push(new Float32Array(p.data.length));
+      }
+    }
+    this._adam.t++;
+    const tt=this._adam.t;
+    
+    // Gradient clipping
+    let gnorm=0;
+    for(const p of this.allParams) for(let i=0;i<p.grad.length;i++) gnorm+=p.grad[i]**2;
+    gnorm=Math.sqrt(gnorm);
+    const clipCoef=gnorm>1.0?1.0/gnorm:1;
+    
+    for(let pi=0;pi<this.allParams.length;pi++){
+      const p=this.allParams[pi];
+      const m=this._adam.m[pi];
+      const v=this._adam.v[pi];
+      // Skip weight decay for LayerNorm params and biases (1-row tensors)
+      const applyWd=p.rows>1;
+      for(let i=0;i<p.data.length;i++){
+        const g=p.grad[i]*clipCoef;
+        m[i]=beta1*m[i]+(1-beta1)*g;
+        v[i]=beta2*v[i]+(1-beta2)*g*g;
+        const mh=m[i]/(1-Math.pow(beta1,tt));
+        const vh=v[i]/(1-Math.pow(beta2,tt));
+        p.data[i]-=lr*(mh/(Math.sqrt(vh)+eps)+(applyWd?wd*p.data[i]:0));
+      }
+    }
+  }
+
+  getEmbedding(tokIdx){
+    const emb=new Float32Array(this.E);
+    for(let e=0;e<this.E;e++) emb[e]=this.wte.get(tokIdx,e);
+    return emb;
+  }
+}
+
+// ---- PCA ----
+function computePCA(vectors){
+  const n=vectors.length;if(n<2)return vectors.map(()=>[0,0]);
+  const d=vectors[0].length;
+  const mean=new Float32Array(d);
+  for(const v of vectors)for(let i=0;i<d;i++)mean[i]+=v[i];
+  for(let i=0;i<d;i++)mean[i]/=n;
+  const centered=vectors.map(v=>{const c=new Float32Array(d);for(let i=0;i<d;i++)c[i]=v[i]-mean[i];return c;});
+  const components=[];
+  const residuals=centered.map(v=>Float32Array.from(v));
+  for(let comp=0;comp<2;comp++){
+    let w=new Float32Array(d);for(let i=0;i<d;i++)w[i]=randn();
+    for(let iter=0;iter<100;iter++){
+      const nw=new Float32Array(d);
+      for(const r of residuals){let dot=0;for(let i=0;i<d;i++)dot+=r[i]*w[i];for(let i=0;i<d;i++)nw[i]+=dot*r[i];}
+      let norm=0;for(let i=0;i<d;i++)norm+=nw[i]**2;norm=Math.sqrt(norm)+1e-10;
+      for(let i=0;i<d;i++)w[i]=nw[i]/norm;
+    }
+    components.push(w);
+    for(const r of residuals){let dot=0;for(let i=0;i<d;i++)dot+=r[i]*w[i];for(let i=0;i<d;i++)r[i]-=dot*w[i];}
+  }
+  return centered.map(v=>{const p=[];for(const w of components){let dot=0;for(let i=0;i<d;i++)dot+=v[i]*w[i];p.push(dot);}return p;});
+}
+
+// ---- t-SNE ----
+function computeTSNE(vectors,perplexity=5,iters=300){
+  const n=vectors.length;if(n<2)return vectors.map(()=>[0,0]);
+  const d=vectors[0].length;
+  const dist=[];
+  for(let i=0;i<n;i++){dist[i]=[];for(let j=0;j<n;j++){let s=0;for(let k=0;k<d;k++)s+=(vectors[i][k]-vectors[j][k])**2;dist[i][j]=s;}}
+  const P=[];for(let i=0;i<n;i++)P[i]=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    let lo=1e-10,hi=1000,beta=1;
+    for(let it=0;it<50;it++){
+      let sumP=0;for(let j=0;j<n;j++){if(j===i)continue;P[i][j]=Math.exp(-dist[i][j]*beta);sumP+=P[i][j];}
+      for(let j=0;j<n;j++)P[i][j]/=(sumP+1e-10);
+      let HH=0;for(let j=0;j<n;j++){if(j===i||P[i][j]<1e-10)continue;HH-=P[i][j]*Math.log2(P[i][j]);}
+      if(2**HH>perplexity){lo=beta;beta=hi>=500?beta*2:(lo+hi)/2;}else{hi=beta;beta=lo<=1e-9?beta/2:(lo+hi)/2;}
+    }
+  }
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const avg=(P[i][j]+P[j][i])/(2*n);P[i][j]=avg;P[j][i]=avg;}
+  const Y=[];for(let i=0;i<n;i++)Y.push([randn()*0.01,randn()*0.01]);
+  const gains=[];const iY=[];for(let i=0;i<n;i++){gains.push([1,1]);iY.push([0,0]);}
+  for(let it=0;it<iters;it++){
+    const Q=[];let sumQ=0;
+    for(let i=0;i<n;i++){Q[i]=new Float32Array(n);for(let j=0;j<n;j++){if(i===j)continue;Q[i][j]=1/(1+(Y[i][0]-Y[j][0])**2+(Y[i][1]-Y[j][1])**2);sumQ+=Q[i][j];}}
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++)Q[i][j]/=(sumQ+1e-10);
+    for(let i=0;i<n;i++){
+      const grad=[0,0];
+      for(let j=0;j<n;j++){if(i===j)continue;const mult=4*(P[i][j]-Q[i][j])/(1+(Y[i][0]-Y[j][0])**2+(Y[i][1]-Y[j][1])**2);grad[0]+=mult*(Y[i][0]-Y[j][0]);grad[1]+=mult*(Y[i][1]-Y[j][1]);}
+      for(let dd=0;dd<2;dd++){
+        gains[i][dd]=(Math.sign(grad[dd])!==Math.sign(iY[i][dd]))?gains[i][dd]+0.2:gains[i][dd]*0.8;
+        gains[i][dd]=Math.max(gains[i][dd],0.01);
+        iY[i][dd]=0.5*iY[i][dd]-10*gains[i][dd]*grad[dd];
+        Y[i][dd]+=iY[i][dd];
+      }
+    }
+  }
+  return Y;
+}
+
+// ================================================================
+//  APP STATE
+// ================================================================
+let tokenizer=new Tokenizer();
+let model=null;
+let isTraining=false;
+let trainTimer=null;
+let lossHistory=[];
+
+// ---- UI Param binding ----
+const paramMap={'emb-size':'emb-val','num-heads':'heads-val','num-layers':'layers-val','ctx-size':'ctx-val','lr':'lr-val','epochs':'epoch-val','temperature':'temp-val','gen-count':'gen-val','dropout':'drop-val','weight-decay':'wd-val'};
+document.querySelectorAll('input[type="range"]').forEach(inp=>{
+  inp.addEventListener('input',()=>{const el=document.getElementById(paramMap[inp.id]);if(el)el.textContent=inp.value;});
+});
+
+function updateSelectors(){
+  const nL=+document.getElementById('num-layers').value;
+  const nH=+document.getElementById('num-heads').value;
+  const ls=document.getElementById('attn-layer');
+  const hs=document.getElementById('attn-head');
+  ls.innerHTML='';hs.innerHTML='';
+  for(let i=0;i<nL;i++)ls.innerHTML+=`<option value="${i}">Layer ${i}</option>`;
+  for(let i=0;i<nH;i++)hs.innerHTML+=`<option value="${i}">Head ${i}</option>`;
+}
+document.getElementById('num-layers').addEventListener('input',updateSelectors);
+document.getElementById('num-heads').addEventListener('input',updateSelectors);
+
+// ---- TRAINING ----
+function startTraining(){
+  if(isTraining)return;
+  const text=document.getElementById('training-text').value;
+  const E=+document.getElementById('emb-size').value;
+  const H=+document.getElementById('num-heads').value;
+  const L=+document.getElementById('num-layers').value;
+  const C=+document.getElementById('ctx-size').value;
+  const lr=+document.getElementById('lr').value;
+  const maxEpochs=+document.getElementById('epochs').value;
+  const dropRate=+document.getElementById('dropout').value;
+  const wd=+document.getElementById('weight-decay').value;
+
+  const allTokens=tokenizer.fit(text);
+  if(allTokens.length<C+1){logMsg('❌ テキストが短すぎます。');return;}
+  
+  // Sliding window samples
+  const samples=[];
+  for(let i=0;i<=allTokens.length-C-1;i++){
+    samples.push({input:allTokens.slice(i,i+C),targets:allTokens.slice(i+1,i+C+1)});
+  }
+  
+  model=new NanoGPT(tokenizer.vocabSize,E,H,L,C,dropRate);
+  updateSelectors();
+  lossHistory=[];
+  
+  const totalParams=model.allParams.reduce((s,p)=>s+p.data.length,0);
+  logMsg(`📊 語彙: ${tokenizer.vocabSize}語, サンプル: ${samples.length}個`);
+  logMsg(`🏗️ emb=${E}, heads=${H}, layers=${L}, ctx=${C}, dropout=${dropRate}`);
+  logMsg(`📐 パラメータ: ${totalParams.toLocaleString()}個`);
+  
+  isTraining=true;
+  document.getElementById('btn-train').disabled=true;
+  document.getElementById('btn-stop').disabled=false;
+  document.getElementById('status-dot').className='status-dot yellow';
+  
+  let epoch=0;
+  function loop(){
+    if(!isTraining||epoch>=maxEpochs){finishTraining();return;}
+    
+    let totalLoss=0;
+    const order=samples.map((_,i)=>i).sort(()=>Math.random()-0.5);
+    
+    model.training=true; // Enable dropout
+    for(const si of order){
+      const s=samples[si];
+      model.zeroGrad();
+      model.forward(s.input);
+      const loss=model.backward(s.input,s.targets);
+      model.step(lr,wd);
+      totalLoss+=loss;
+    }
+    
+    const avgLoss=totalLoss/samples.length/C;
+    lossHistory.push(avgLoss);
+    epoch++;
+    
+    if(epoch%10===0||epoch===1||epoch===maxEpochs){
+      logMsg(`<span style="color:#6366f1">Epoch ${epoch}/${maxEpochs}</span> — Loss: <span style="color:#f59e0b">${avgLoss.toFixed(4)}</span>`);
+      drawLossChart();
+    }
+    document.getElementById('status-text').textContent=`学習中... ${epoch}/${maxEpochs} (loss=${avgLoss.toFixed(3)})`;
+    trainTimer=setTimeout(loop,0);
+  }
+  loop();
+}
+
+function stopTraining(){
+  isTraining=false;if(trainTimer)clearTimeout(trainTimer);
+  document.getElementById('btn-train').disabled=false;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('status-dot').className='status-dot yellow';
+  document.getElementById('status-text').textContent='停止';
+  logMsg('<span style="color:#10b981">⏹ 停止しました</span>');
+  if(model)updateVectorVis();
+}
+
+function finishTraining(){
+  isTraining=false;
+  document.getElementById('btn-train').disabled=false;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('status-dot').className='status-dot green';
+  document.getElementById('status-text').textContent='学習完了 ✓';
+  logMsg('<span style="color:#10b981">✅ 学習完了！</span>');
+  drawLossChart();
+  if(model)updateVectorVis();
+}
+
+function resetModel(){
+  stopTraining();model=null;lossHistory=[];
+  document.getElementById('training-log').innerHTML='';
+  document.getElementById('token-stream').innerHTML='';
+  document.getElementById('prob-list').innerHTML='';
+  document.getElementById('pred-info').style.display='none';
+  document.getElementById('status-dot').className='status-dot red';
+  document.getElementById('status-text').textContent='未学習';
+  clearCanvas('vector-canvas');clearCanvas('attention-canvas');clearCanvas('loss-chart');
+}
+
+function logMsg(m){const l=document.getElementById('training-log');l.innerHTML+=m+'<br>';l.scrollTop=l.scrollHeight;}
+
+function drawLossChart(){
+  const canvas=document.getElementById('loss-chart');
+  const ctx=canvas.getContext('2d');
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*devicePixelRatio;canvas.height=rect.height*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  const W=rect.width,H=rect.height;
+  ctx.fillStyle='#0d1117';ctx.fillRect(0,0,W,H);
+  if(lossHistory.length<2)return;
+  const pad=35;
+  const maxL=Math.max(...lossHistory);const minL=Math.min(...lossHistory);
+  const range=maxL-minL||1;
+  ctx.strokeStyle='#1e2740';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=pad+(H-2*pad)*i/4;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-10,y);ctx.stroke();
+    ctx.fillStyle='#7a82a6';ctx.font='9px monospace';ctx.textAlign='right';ctx.fillText((maxL-range*i/4).toFixed(2),pad-4,y+3);}
+  ctx.beginPath();ctx.strokeStyle='#6366f1';ctx.lineWidth=2;
+  for(let i=0;i<lossHistory.length;i++){
+    const x=pad+i/(lossHistory.length-1)*(W-pad-10);
+    const y=pad+(1-(lossHistory[i]-minL)/range)*(H-2*pad);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle='#7a82a6';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('Epoch',W/2,H-2);
+}
+
+// ---- GENERATION ----
+let currentGen=[];
+
+function getProbs(text,temp){
+  if(!model){alert('先にモデルを学習してください');return null;}
+  model.training=false; // Disable dropout for inference
+  const tokens=tokenizer.encode(text);
+  const C=model.C;
+  const input=tokens.slice(-C);
+  while(input.length<C)input.unshift(0);
+  const allLogits=model.forward(input);
+  const logits=allLogits[allLogits.length-1];
+  const scaled=Array.from(logits).map(x=>x/temp);
+  return softmax(scaled);
+}
+
+function sample(probs){let r=Math.random(),c=0;for(let i=0;i<probs.length;i++){c+=probs[i];if(r<c)return i;}return probs.length-1;}
+
+function generateStep(){
+  const temp=+document.getElementById('temperature').value;
+  const prompt=document.getElementById('prompt-text').value;
+  const full=currentGen.length?prompt+' '+currentGen.join(' '):prompt;
+  const probs=getProbs(full,temp);if(!probs)return;
+  showProbs(probs);
+  const idx=sample(probs);
+  currentGen.push(tokenizer.i2w[idx]||'?');
+  showStream(prompt,currentGen);
+  showPredInfo(probs);
+}
+
+function generateTokens(){
+  clearGeneration();
+  const n=+document.getElementById('gen-count').value;
+  const temp=+document.getElementById('temperature').value;
+  const prompt=document.getElementById('prompt-text').value;
+  if(!model){alert('先にモデルを学習してください');return;}
+  
+  let lastProbs=null;
+  for(let i=0;i<n;i++){
+    const full=currentGen.length?prompt+' '+currentGen.join(' '):prompt;
+    const probs=getProbs(full,temp);if(!probs)return;
+    lastProbs=probs;
+    currentGen.push(tokenizer.i2w[sample(probs)]||'?');
+  }
+  showStream(prompt,currentGen);
+  
+  // Show prob for what the NEXT token would be
+  const finalFull=prompt+' '+currentGen.join(' ');
+  const fp=getProbs(finalFull,temp);
+  if(fp){showProbs(fp);showPredInfo(fp);}
+}
+
+function clearGeneration(){currentGen=[];document.getElementById('token-stream').innerHTML='';document.getElementById('prob-list').innerHTML='';document.getElementById('pred-info').style.display='none';}
+
+function showStream(prompt,gen){
+  const c=document.getElementById('token-stream');c.innerHTML='';
+  for(const t of prompt.toLowerCase().replace(/([.,!?;:'])/g,' $1 ').split(/\s+/).filter(w=>w)){
+    const d=document.createElement('span');d.className='token-chip';d.textContent=t;c.appendChild(d);
+  }
+  for(const t of gen){
+    const d=document.createElement('span');d.className='token-chip predicted';d.textContent=t;c.appendChild(d);
+  }
+}
+
+function showProbs(probs){
+  const c=document.getElementById('prob-list');c.innerHTML='';
+  const items=probs.map((p,i)=>({p,t:tokenizer.i2w[i]||'?'})).sort((a,b)=>b.p-a.p).slice(0,15);
+  const maxP=items[0].p;
+  for(const item of items){
+    const d=document.createElement('div');d.className='prob-row';
+    const barW=maxP>0?(item.p/maxP*100):0; // relative to max
+    d.innerHTML=`<span class="prob-label">${item.t}</span><div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${barW.toFixed(1)}%"></div></div><span class="prob-val">${(item.p*100).toFixed(1)}%</span>`;
+    c.appendChild(d);
+  }
+}
+
+function showPredInfo(probs){
+  const sorted=probs.map((p,i)=>({p,i})).sort((a,b)=>b.p-a.p);
+  const top1=sorted[0];
+  const entropy=-probs.reduce((s,p)=>s+(p>1e-10?p*Math.log2(p):0),0);
+  const perplexity=Math.pow(2,entropy);
+  const info=document.getElementById('pred-info');
+  info.style.display='block';
+  info.innerHTML=`<strong>エントロピー:</strong> ${entropy.toFixed(3)} bits | <strong>パープレキシティ:</strong> ${perplexity.toFixed(2)} | <strong>Top-1確率:</strong> ${(top1.p*100).toFixed(1)}% ("${tokenizer.i2w[top1.i]||'?'}") | <strong>分布の多様性:</strong> ${entropy<0.5?'⚠️ 非常に確信的 (過学習の可能性)':entropy<1.5?'やや確信的':'✓ 良好な分布'}`;
+}
+
+// ---- VECTOR VIS ----
+function updateVectorVis(){
+  if(!model)return;
+  const canvas=document.getElementById('vector-canvas');
+  const ctx=canvas.getContext('2d');
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*devicePixelRatio;canvas.height=rect.height*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  const W=rect.width,H=rect.height;
+  ctx.fillStyle='#0d1117';ctx.fillRect(0,0,W,H);
+  
+  const embeddings=[],labels=[];
+  for(let i=0;i<tokenizer.vocabSize;i++){embeddings.push(Array.from(model.getEmbedding(i)));labels.push(tokenizer.i2w[i]);}
+  if(embeddings.length<2){ctx.fillStyle='#7a82a6';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('語彙が少なすぎます',W/2,H/2);return;}
+  
+  const method=document.getElementById('vis-method').value;
+  const points=method==='tsne'?computeTSNE(embeddings,Math.max(2,Math.min(8,Math.floor(embeddings.length/3))),250):computePCA(embeddings);
+  
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const p of points){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+  const rx=maxX-minX||1,ry=maxY-minY||1,pad=70;
+  const sp=points.map(p=>[pad+(p[0]-minX)/rx*(W-2*pad),pad+(p[1]-minY)/ry*(H-2*pad)]);
+  
+  // Grid
+  ctx.strokeStyle='#1a2035';ctx.lineWidth=1;
+  for(let i=0;i<=10;i++){
+    const x=pad+(W-2*pad)*i/10;ctx.beginPath();ctx.moveTo(x,pad);ctx.lineTo(x,H-pad);ctx.stroke();
+    const y=pad+(H-2*pad)*i/10;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();
+  }
+  
+  if(document.getElementById('show-connections').checked){
+    for(let i=0;i<embeddings.length;i++)for(let j=i+1;j<embeddings.length;j++){
+      let dot=0,ni=0,nj=0;
+      for(let k=0;k<embeddings[i].length;k++){dot+=embeddings[i][k]*embeddings[j][k];ni+=embeddings[i][k]**2;nj+=embeddings[j][k]**2;}
+      const sim=dot/(Math.sqrt(ni)*Math.sqrt(nj)+1e-10);
+      if(sim>0.5){ctx.beginPath();ctx.moveTo(sp[i][0],sp[i][1]);ctx.lineTo(sp[j][0],sp[j][1]);ctx.strokeStyle=`rgba(99,102,241,${(sim-0.5)*0.8})`;ctx.lineWidth=(sim-0.5)*3;ctx.stroke();}
+    }
+  }
+  
+  const colors=['#6366f1','#8b5cf6','#a78bfa','#c084fc','#f472b6','#fb7185','#f59e0b','#10b981','#06b6d4','#3b82f6','#ef4444','#84cc16','#e879f9','#22d3ee','#fbbf24','#a3e635','#d946ef','#14b8a6','#f97316','#64748b'];
+  
+  for(let i=0;i<sp.length;i++){
+    const[x,y]=sp[i];const color=colors[i%colors.length];
+    const gr=ctx.createRadialGradient(x,y,0,x,y,14);gr.addColorStop(0,color+'80');gr.addColorStop(1,color+'00');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff2';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.stroke();
+    if(document.getElementById('show-labels').checked){
+      ctx.fillStyle='#e0e6f0';ctx.font='bold 11px "Segoe UI",sans-serif';ctx.textAlign='center';ctx.fillText(labels[i],x,y-12);
+    }
+  }
+  
+  ctx.fillStyle='#7a82a6';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText(`${method.toUpperCase()} — ${embeddings.length} tokens, ${embeddings[0].length}D → 2D`,pad,20);
+  
+  canvas._sp=sp;canvas._labels=labels;canvas._emb=embeddings;
+}
+
+document.getElementById('vector-canvas').addEventListener('mousemove',function(e){
+  if(!this._sp)return;
+  const rect=this.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const tt=document.getElementById('tooltip');let found=false;
+  for(let i=0;i<this._sp.length;i++){
+    if(Math.hypot(mx-this._sp[i][0],my-this._sp[i][1])<15){
+      tt.style.display='block';tt.style.left=(e.clientX+15)+'px';tt.style.top=(e.clientY-10)+'px';
+      tt.querySelector('.tt-token').textContent=`"${this._labels[i]}" (id: ${i})`;
+      const v=this._emb[i].slice(0,10).map(v=>v.toFixed(3)).join(', ');
+      tt.querySelector('.tt-vec').textContent=`embedding=[${v}${this._emb[i].length>10?', ...':''}] (${this._emb[i].length}D)`;
+      // cosine similarity to nearest neighbors
+      let sims=[];
+      for(let j=0;j<this._emb.length;j++){
+        if(j===i)continue;
+        let dot=0,ni2=0,nj2=0;
+        for(let k=0;k<this._emb[i].length;k++){dot+=this._emb[i][k]*this._emb[j][k];ni2+=this._emb[i][k]**2;nj2+=this._emb[j][k]**2;}
+        sims.push({j,sim:dot/(Math.sqrt(ni2)*Math.sqrt(nj2)+1e-10)});
+      }
+      sims.sort((a,b)=>b.sim-a.sim);
+      const top3=sims.slice(0,3).map(s=>`${this._labels[s.j]}(${s.sim.toFixed(2)})`).join(', ');
+      tt.querySelector('.tt-vec').textContent+=`\n最近傍: ${top3}`;
+      found=true;break;
+    }
+  }
+  if(!found)tt.style.display='none';
+});
+document.getElementById('vector-canvas').addEventListener('mouseleave',()=>{document.getElementById('tooltip').style.display='none';});
+
+// ---- ATTENTION VIS ----
+function visualizeAttention(){
+  if(!model){alert('先にモデルを学習してください');return;}
+  model.training=false;
+  const text=document.getElementById('attn-text').value;
+  const tokens=tokenizer.encode(text);
+  const C=model.C;const input=tokens.slice(-C);while(input.length<C)input.unshift(0);
+  model.forward(input);
+  const li=+document.getElementById('attn-layer').value;
+  const hi=+document.getElementById('attn-head').value;
+  if(!model.lastAttnWeights||!model.lastAttnWeights[li])return;
+  const w=model.lastAttnWeights[li][hi];
+  const labs=input.map(i=>tokenizer.i2w[i]||'<pad>');
+  drawAttnHeatmap(w,labs);
+}
+
+function drawAttnHeatmap(weights,labels){
+  const canvas=document.getElementById('attention-canvas');
+  const ctx=canvas.getContext('2d');
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*devicePixelRatio;canvas.height=rect.height*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  const W=rect.width,H=rect.height;
+  ctx.fillStyle='#0d1117';ctx.fillRect(0,0,W,H);
+  const T=weights.length;const pad=80;
+  const cellW=Math.min((W-2*pad)/T,45);const cellH=Math.min((H-2*pad)/T,45);
+  const sx=(W-cellW*T)/2,sy=(H-cellH*T)/2;
+  
+  for(let i=0;i<T;i++)for(let j=0;j<T;j++){
+    const v=j<weights[i].length?weights[i][j]:0;
+    const intensity=Math.min(v*1.5,1);
+    // Purple-based heatmap
+    const r=Math.floor(30+intensity*200);
+    const g=Math.floor(20+intensity*60);
+    const b=Math.floor(80+intensity*175);
+    ctx.fillStyle=`rgba(${r},${g},${b},${0.15+intensity*0.85})`;
+    ctx.fillRect(sx+j*cellW,sy+i*cellH,cellW-1,cellH-1);
+    if(cellW>22){ctx.fillStyle=intensity>0.35?'#fff':'#5a6080';ctx.font='9px monospace';ctx.textAlign='center';ctx.fillText(v.toFixed(2),sx+j*cellW+cellW/2,sy+i*cellH+cellH/2+3);}
+  }
+  
+  ctx.fillStyle='#a5b4fc';ctx.font='10px "Segoe UI",sans-serif';
+  for(let i=0;i<T;i++){
+    ctx.textAlign='right';ctx.fillText(labels[i],sx-6,sy+i*cellH+cellH/2+3);
+    ctx.save();ctx.translate(sx+i*cellW+cellW/2,sy-6);ctx.rotate(-Math.PI/4);ctx.textAlign='right';ctx.fillText(labels[i],0,0);ctx.restore();
+  }
+  ctx.fillStyle='#7a82a6';ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Key (参照先)',W/2,sy+T*cellH+30);
+  ctx.save();ctx.translate(sx-55,sy+T*cellH/2);ctx.rotate(-Math.PI/2);ctx.fillText('Query (参照元)',0,0);ctx.restore();
+}
+
+function clearCanvas(id){
+  const c=document.getElementById(id);const ctx=c.getContext('2d');
+  const r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);ctx.fillStyle='#0d1117';ctx.fillRect(0,0,r.width,r.height);
+}
+
+window.addEventListener('load',()=>{clearCanvas('vector-canvas');clearCanvas('attention-canvas');clearCanvas('loss-chart');updateSelectors();});
+window.addEventListener('resize',()=>{if(model){updateVectorVis();drawLossChart();}});
+</script>
+</body>
+</html>
